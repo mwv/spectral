@@ -18,7 +18,7 @@ readme = open('README.rst').read()
 
 setup(
     name='spectral',
-    version='0.1.0',
+    version='0.1.1',
     description='Python package for extracing Mel and MFCC features from speech.',
     long_description=readme,
     author='Maarten Versteegh',
