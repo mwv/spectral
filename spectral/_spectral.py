@@ -23,6 +23,8 @@ import abc
 import numpy as np
 import scipy.signal
 
+from _logspec import pre_emphasis
+
 
 def hertz_to_mel(f):
     """Convert frequency in Hertz to mel.
@@ -214,7 +216,7 @@ class _Spec(object):
             deltas = self.mfcc_deltas
         if deltasdeltas is None:
             deltasdeltas = self.mfcc_deltasdeltas
-
+        sig = sig.astype(np.double)
         nfr = int(len(sig) / self.fshift + 1)
         mfcc = np.zeros((nfr, self.ncep), 'd')
         fr = 0
@@ -242,7 +244,7 @@ class _Spec(object):
             deltas = self.mfcc_deltas
         if deltasdeltas is None:
             deltasdeltas = self.mfcc_deltasdeltas
-
+        sig = sig.astype(np.double)
         nfr = int(len(sig) / self.fshift + 1)
         mfcc = np.zeros((nfr, self.nfilt), 'd')
         fr = 0
@@ -264,16 +266,18 @@ class _Spec(object):
             c = np.c_[c, dd]
         return c
 
-    def pre_emphasis(self, frame):
-        outfr = np.empty(len(frame), 'd')
-        outfr[0] = frame[0] - self.alpha * self.prior
-        for i in range(1, len(frame)):
-            outfr[i] = frame[i] - self.alpha * frame[i-1]
-        self.prior = frame[-1]
-        return outfr
+    # def pre_emphasis(self, frame):
+    #     outfr = np.empty(len(frame), 'd')
+    #     outfr[0] = frame[0] - self.alpha * self.prior
+    #     for i in range(1, len(frame)):
+    #         outfr[i] = frame[i] - self.alpha * frame[i-1]
+    #     self.prior = frame[-1]
+    #     return outfr
 
     def frame2logspec(self, frame):
-        frame = self.pre_emphasis(frame) * self.win
+        tmp = frame[-1]
+        frame = pre_emphasis(frame, self.prior, self.alpha) * self.win
+        self.prior = tmp
         fft = np.fft.rfft(frame, self.nfft)
         power = fft.real * fft.real + fft.imag * fft.imag
         return np.log(np.dot(power, self.filters).clip(1e-5, np.inf))

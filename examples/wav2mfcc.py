@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # ------------------------------------
-# file: wav2mfcc.py
-# date: Fri February 07 22:24 2014
+# file: features.py
+# date: Tue April 22 18:31 2014
 # author:
 # Maarten Versteegh
 # github.com/mwv
@@ -11,40 +11,136 @@
 #
 # Licensed under GPLv3
 # ------------------------------------
-"""wav2mfcc: convert wave file args[1] to mfcc txt file args[2]
+"""wav2mfcc: convert wave files to mfcc
 
 """
 
 from __future__ import division
 
-from spectral import MFCC
+import argparse
+import json
+import os.path as path
+import os
 import wave
 import struct
-import sys
+
 import numpy as np
 
-input = sys.argv[1]
-output = sys.argv[2]
+import spectral
 
-# load wave file as numpy array, needs adjustment for multichannel files
-fid = wave.open(input, 'r')
-_, _, fs, nframes, _, _ = fid.getparams()
-sig = np.array(struct.unpack_from("%dh" % nframes, fid.readframes(nframes)))
-fid.close()
 
-# convert to mfccs
-mfcc = MFCC(nfilt=40,               # number of filters in mel bank
-            ncep=13,                # number of cepstra
-            alpha=0.97,             # pre-emphasis
-            fs=fs,                  # sampling rate
-            frate=100,              # frame rate
-            wlen=0.01,              # window length
-            nfft=512,               # length of dft
-            mfcc_deltas=True,       # also return speed
-            mfcc_deltasdeltas=True  # also return acceleration
-            )
-feats = mfcc.transform(sig)
-# if deltas are used, stack them all up
-if len(feats) > 1:
-    feats = np.hstack(feats)
-np.savetxt(output, feats)
+def resample(sig, ratio):
+    try:
+        import scikits.samplerate
+        return scikits.samplerate.resample(sig, ratio, 'sinc_best')
+    except ImportError:
+        import scipy.signal
+        return scipy.signal.resample(sig, int(round(sig.shape[0] * ratio)))
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        prog='wav2mfcc.py',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description='Extract spectral features from audio files.',
+        epilog="""Example usage:
+
+$ ./wav2mfcc.py *.wav -o . -c mel_config.json
+
+extracts features from audio files in current directory.\n
+
+The output format is binary .npy containing an array of nframes x nfeatures.
+To load these files in python:
+
+>>> import numpy as np
+>>> features = np.load('/path/to/file.npy')
+""")
+    parser.add_argument('files', metavar='WAV',
+                        nargs='+',
+                        help='input audio files')
+    parser.add_argument('-o', '--output',
+                        action='store',
+                        dest='outdir',
+                        required=True,
+                        help='output directory')
+    parser.add_argument('-c', '--config',
+                        action='store',
+                        dest='config',
+                        required=True,
+                        help='configuration file')
+    parser.add_argument('-t', '--type',
+                        action='store',
+                        dest='type',
+                        default='MFCC',
+                        help=('type of features to extract. valid choices are '
+                              '"Mel" and "MFCC" [default]'))
+    parser.add_argument('-f', '--force',
+                        action='store_true',
+                        dest='force',
+                        default=False,
+                        help='force resampling in case of samplerate mismatch')
+    return vars(parser.parse_args())
+
+
+def convert(files, outdir, encoder, force):
+    for f in files:
+        try:
+            fid = wave.open(f, 'r')
+            _, _, fs, nframes, _, _ = fid.getparams()
+            sig = np.array(struct.unpack_from("%dh" % nframes,
+                                              fid.readframes(nframes)))
+            fid.close()
+        except IOError:
+            print 'No such file:', f
+            exit()
+
+        if fs != encoder.config['fs']:
+            if force:
+                sig = resample(sig, fs / encoder.config['fs'])
+                # resample
+                pass
+            else:
+                print ('Samplerate mismatch, expected {0}, got {1}, in {2}.\n'
+                       'Use option -f to force resampling of the audio file.'
+                       .format(encoder.config['fs'], fs, f))
+                exit()
+
+        feats = np.hstack(encoder.transform(sig))
+        bname = path.splitext(path.basename(f))[0]
+        wshift_smp = encoder.config['fs'] / encoder.config['frate']
+        nframes = int(sig.shape[0] / wshift_smp + 1)
+        if nframes != feats.shape[0]:
+            raise ValueError('nframes mismatch. expected {0}, got {1}'
+                             .format(feats.shape[0], nframes))
+        np.save(path.join(outdir, bname + '.npy'), feats)
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    config_file = args['config']
+    try:
+        with open(config_file, 'r') as fid:
+            config = json.load(fid)
+    except IOError:
+        print 'No such file:', config_file
+        exit()
+
+    outdir = args['outdir']
+    if not os.path.exists(outdir):
+        print 'No such directory:', outdir
+        exit()
+
+    feat_type = args['type']
+    allowed_feat_types = ['Mel', 'MFCC']
+    if not feat_type in allowed_feat_types:
+        print 'Wrong feature type: {0}. Must be one of [{1}]'.format(
+            feat_type, ', '.join(allowed_feat_types))
+
+    if feat_type == 'Mel':
+        encoder = spectral.Mel(**config)
+    elif feat_type == 'MFCC':
+        encoder = spectral.MFCC(**config)
+
+    force = args['force']
+    files = args['files']
+    convert(files, outdir, encoder, force)
