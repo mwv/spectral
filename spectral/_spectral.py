@@ -84,6 +84,27 @@ class Mel(Spectral):
         return self._s.config
 
 
+class CubicMel(Spectral):
+    def __init__(self, **kwargs):
+        self._s = _Spec(**kwargs)
+
+    def transform(self, sig):
+        s = np.power(self._s.sig2spec(sig), 1./3)
+        nfilt = self._s.config['nfilt']
+        ds = self._s.config['mel_deltas']
+        dds = self._s.config['mel_deltasdeltas']
+        r = [s[:, :nfilt]]
+        if ds:
+            r.append(s[:, nfilt:2*nfilt])
+        if dds:
+            r.append(s[:, 2*nfilt:3*nfilt])
+        return r
+
+    @property
+    def config(self):
+        return self._s.config
+
+
 class MFCC(Spectral):
     def __init__(self, **kwargs):
         self._s = _Spec(**kwargs)
@@ -116,10 +137,10 @@ class _Spec(object):
                  frate=100,
                  wlen=0.01,             # window length
                  nfft=512,              # length of dft
-                 mfcc_deltas=True,
-                 mfcc_deltasdeltas=True,
-                 mel_deltas=True,
-                 mel_deltasdeltas=True
+                 mfcc_deltas=False,
+                 mfcc_deltasdeltas=False,
+                 mel_deltas=False,
+                 mel_deltasdeltas=False
                  ):
         # store params
         self.lowerf = lowerf
@@ -266,6 +287,32 @@ class _Spec(object):
             c = np.c_[c, dd]
         return c
 
+    def sig2spec(self, sig, deltas=None, deltasdeltas=None):
+        if deltas is None:
+            deltas = self.mfcc_deltas
+        if deltasdeltas is None:
+            deltasdeltas = self.mfcc_deltasdeltas
+        sig = sig.astype(np.double)
+        nfr = int(len(sig) / self.fshift + 1)
+        mfcc = np.zeros((nfr, self.nfilt), 'd')
+        fr = 0
+        while fr < nfr:
+            start = round(fr * self.fshift)
+            end = min(len(sig), start + self.wlen_samples)
+            frame = sig[start:end]
+            if len(frame) < self.wlen_samples:
+                frame = np.resize(frame, self.wlen_samples)
+                frame[self.wlen_samples:] = 0
+            mfcc[fr] = self.frame2spec(frame)
+            fr += 1
+        c = mfcc
+        if deltas:
+            d = self.deltas(mfcc)
+            c = np.c_[c, d]
+        if deltasdeltas:
+            dd = self.deltasdeltas(mfcc)
+            c = np.c_[c, dd]
+        return c
     # def pre_emphasis(self, frame):
     #     outfr = np.empty(len(frame), 'd')
     #     outfr[0] = frame[0] - self.alpha * self.prior
@@ -274,13 +321,16 @@ class _Spec(object):
     #     self.prior = frame[-1]
     #     return outfr
 
-    def frame2logspec(self, frame):
+    def frame2spec(self, frame):
         tmp = frame[-1]
         frame = pre_emphasis(frame, self.prior, self.alpha) * self.win
         self.prior = tmp
         fft = np.fft.rfft(frame, self.nfft)
         power = fft.real * fft.real + fft.imag * fft.imag
-        return np.log(np.dot(power, self.filters).clip(1e-5, np.inf))
+        return np.dot(power, self.filters).clip(1e-5, np.inf)
+
+    def frame2logspec(self, frame):
+        return np.log(self.frame2spec(frame))
 
     def frame2s2mfc(self, frame):
         logspec = self.frame2logspec(frame)
