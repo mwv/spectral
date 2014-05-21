@@ -45,9 +45,9 @@ def parse_args():
         description='Extract spectral features from audio files.',
         epilog="""Example usage:
 
-$ ./wav2mfcc.py *.wav -o . -c mel_config.json
+$ ./wav2mfcc.py *.wav -o . -c config.json
 
-extracts features from audio files in current directory.\n
+extracts features from audio files in current directory.
 
 The output format is binary .npy containing an array of nframes x nfeatures.
 To load these files in python:
@@ -68,12 +68,6 @@ To load these files in python:
                         dest='config',
                         required=True,
                         help='configuration file')
-    parser.add_argument('-t', '--type',
-                        action='store',
-                        dest='type',
-                        default='MFCC',
-                        help=('type of features to extract. valid choices are '
-                              '"Mel" and "MFCC" [default]'))
     parser.add_argument('-f', '--force',
                         action='store_true',
                         dest='force',
@@ -105,13 +99,9 @@ def convert(files, outdir, encoder, force):
                        .format(encoder.config['fs'], fs, f))
                 exit()
 
-        feats = np.hstack(encoder.transform(sig))
+        # feats = np.hstack(encoder.transform(sig))
+        feats = encoder.transform(sig)
         bname = path.splitext(path.basename(f))[0]
-        wshift_smp = encoder.config['fs'] / encoder.config['frate']
-        nframes = int(sig.shape[0] / wshift_smp + 1)
-        if nframes != feats.shape[0]:
-            raise ValueError('nframes mismatch. expected {0}, got {1}'
-                             .format(feats.shape[0], nframes))
         np.save(path.join(outdir, bname + '.npy'), feats)
 
 
@@ -130,16 +120,8 @@ if __name__ == '__main__':
         print 'No such directory:', outdir
         exit()
 
-    feat_type = args['type']
-    allowed_feat_types = ['Mel', 'MFCC']
-    if not feat_type in allowed_feat_types:
-        print 'Wrong feature type: {0}. Must be one of [{1}]'.format(
-            feat_type, ', '.join(allowed_feat_types))
 
-    if feat_type == 'Mel':
-        encoder = spectral.Mel(**config)
-    elif feat_type == 'MFCC':
-        encoder = spectral.MFCC(**config)
+    encoder = _spectral._Spec(**config)
 
     force = args['force']
     files = args['files']
