@@ -45,7 +45,7 @@ def mel_to_hertz(m):
     return 700. * (np.power(10., m/2595) - 1.)
 
 
-class Spectral(object):
+class SpectralABC(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
@@ -64,10 +64,10 @@ class Spectral(object):
         return
 
 
-class Mel(Spectral):
+class Mel(SpectralABC):
     def __init__(self, **kwargs):
         kwargs['do_dct'] = False
-        self._s = _Spec(**kwargs)
+        self._s = Spectral(**kwargs)
 
     def transform(self, sig):
         s = self._s.sig2logspec(sig)
@@ -86,14 +86,14 @@ class Mel(Spectral):
         return self._s.config
 
 
-class CubicMel(Spectral):
+class CubicMel(SpectralABC):
     def __init__(self, **kwargs):
         warnings.warn('CubicMel class will be deprecated in a future release.'
                       ' Use Mel class with keyword `compression=\'cubicroot\'`'
                       ' instead.', PendingDeprecationWarning)
         kwargs['compression'] = 'cubicroot'
         kwargs['do_dct'] = False
-        self._s = _Spec(**kwargs)
+        self._s = Spectral(**kwargs)
 
     def transform(self, sig):
         s = self._s.transform(sig)
@@ -113,10 +113,10 @@ class CubicMel(Spectral):
         return self._s.config
 
 
-class MFCC(Spectral):
+class MFCC(SpectralABC):
     def __init__(self, **kwargs):
         kwargs['do_dct'] = True
-        self._s = _Spec(**kwargs)
+        self._s = Spectral(**kwargs)
 
     def transform(self, sig):
         s = self._s.transform(sig)
@@ -135,7 +135,7 @@ class MFCC(Spectral):
         return self._s.config
 
 
-class _Spec(object):
+class Spectral(object):
     def __init__(self,
                  nfilt=40,              # number of filters in mel bank
                  ncep=13,               # number of cepstra
