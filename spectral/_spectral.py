@@ -243,6 +243,7 @@ class _Spec(object):
                     frate=self.frate,
                     wlen=self.wlen_secs,
                     nfft=self.nfft,
+                    compression=self.compression,
                     do_deltas=self.do_deltas,
                     do_deltasdeltas=self.do_deltasdeltas)
 
