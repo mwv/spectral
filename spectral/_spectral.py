@@ -119,7 +119,7 @@ class MFCC(Spectral):
         self._s = _Spec(**kwargs)
 
     def transform(self, sig):
-        s = self._s.mfcc(sig)
+        s = self._s.transform(sig)
         nceps = self._s.config['ncep']
         ds = self._s.config['do_deltas']
         dds = self._s.config['do_deltasdeltas']
