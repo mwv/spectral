@@ -157,7 +157,7 @@ class Spectral(object):
                   .format(nfilt))
         if upperf > fs // 2:
             raise(Exception,
-                  "Upper frequency %f exceeds Nyquist %f" % (upperf. fs // 2))
+                  "Upper frequency %f exceeds Nyquist %f" % (upperf, fs // 2))
         compression_types = ['log', 'cubicroot']
         if not compression in compression_types:
             raise(Exception,
@@ -279,6 +279,7 @@ class Spectral(object):
             r = np.c_[r, self.calc_deltas(c)]
         if self.do_deltasdeltas:
             r = np.c_[r, self.calc_deltasdeltas(c)]
+        self.prior = 0
         return r
 
     def frame2spec(self, frame):
