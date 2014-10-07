@@ -28,7 +28,7 @@ np_inc = [os.path.join(np_lib, 'core/include')]
 
 setup(
     name='spectral',
-    version='0.1.6',
+    version='0.1.7',
     description=('Python package for extracing Mel '
                  'and MFCC features from speech.'),
     long_description=readme,

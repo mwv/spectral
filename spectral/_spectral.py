@@ -161,7 +161,7 @@ class Spectral(object):
         compression_types = ['log', 'cubicroot']
         if not compression in compression_types:
             raise(Exception,
-                  'Compression must be one of [{0:%s}], not {1}'
+                  'Compression must be one of [{0:s}], not {1}'
                   .format(', '.join(compression_types), compression))
 
         # store params
