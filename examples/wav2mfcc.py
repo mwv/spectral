@@ -121,7 +121,7 @@ if __name__ == '__main__':
         exit()
 
 
-    encoder = _spectral._Spec(**config)
+    encoder = spectral.Spectral(**config)
 
     force = args['force']
     files = args['files']

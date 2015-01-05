@@ -18,153 +18,83 @@ License: BSD style
 
 from __future__ import division
 
-import abc
-
 import numpy as np
 import scipy.signal
-import warnings
 
 from _logspec import pre_emphasis
-
-
-def hertz_to_mel(f):
-    """Convert frequency in Hertz to mel.
-
-    :param f: frequency in Hertz
-    :return: frequency in mel
-    """
-    return 2595. * np.log10(1.+f/700)
-
-
-def mel_to_hertz(m):
-    """Convert frequency in mel to Hertz.
-
-    :param m: frequency in mel
-    :return: frequency in Hertz
-    """
-    return 700. * (np.power(10., m/2595) - 1.)
-
-
-class SpectralABC(object):
-    __metaclass__ = abc.ABCMeta
-
-    @abc.abstractmethod
-    def transform(self, signal):
-        """Return the spectral transform of \c signal.
-
-        :return:
-          Iterable of ndarrays(n_frames, n_features). Typically, the iter
-          will consist of the static, delta and double-delta spectral features.
-        """
-        return
-
-    @abc.abstractproperty
-    def config(self):
-        """Return a dict of configuration values."""
-        return
-
-
-class Mel(SpectralABC):
-    def __init__(self, **kwargs):
-        kwargs['do_dct'] = False
-        self._s = Spectral(**kwargs)
-
-    def transform(self, sig):
-        s = self._s.sig2logspec(sig)
-        nfilt = self._s.config['nfilt']
-        ds = self._s.config['do_deltas']
-        dds = self._s.config['do_deltasdeltas']
-        r = [s[:, :nfilt]]
-        if ds:
-            r.append(s[:, nfilt:2*nfilt])
-        if dds:
-            r.append(s[:, 2*nfilt:3*nfilt])
-        return r
-
-    @property
-    def config(self):
-        return self._s.config
-
-
-class CubicMel(SpectralABC):
-    def __init__(self, **kwargs):
-        warnings.warn('CubicMel class will be deprecated in a future release.'
-                      ' Use Mel class with keyword `compression=\'cubicroot\'`'
-                      ' instead.', PendingDeprecationWarning)
-        kwargs['compression'] = 'cubicroot'
-        kwargs['do_dct'] = False
-        self._s = Spectral(**kwargs)
-
-    def transform(self, sig):
-        s = self._s.transform(sig)
-        # s = np.power(self._s.sig2spec(sig), 1./3)
-        nfilt = self._s.config['nfilt']
-        ds = self._s.config['do_deltas']
-        dds = self._s.config['do_deltasdeltas']
-        r = [s[:, :nfilt]]
-        if ds:
-            r.append(s[:, nfilt:2*nfilt])
-        if dds:
-            r.append(s[:, 2*nfilt:3*nfilt])
-        return r
-
-    @property
-    def config(self):
-        return self._s.config
-
-
-class MFCC(SpectralABC):
-    def __init__(self, **kwargs):
-        kwargs['do_dct'] = True
-        self._s = Spectral(**kwargs)
-
-    def transform(self, sig):
-        s = self._s.transform(sig)
-        nceps = self._s.config['ncep']
-        ds = self._s.config['do_deltas']
-        dds = self._s.config['do_deltasdeltas']
-        r = [s[:, :nceps]]
-        if ds:
-            r.append(s[:, nceps:2*nceps])
-        if dds:
-            r.append(s[:, 2*nceps:3*nceps])
-        return r
-
-    @property
-    def config(self):
-        return self._s.config
-
+import scales
 
 class Spectral(object):
+    """
+    Extract spectral features from an audio signal.
+
+    Parameters
+    ----------
+    scale : {'mel', 'bark', 'erb'}
+        Perceptual scale.
+    nfilt : int, optional
+        Number of filters.
+    do_dct : bool, optional
+        Perform Discrete Cosine Transform.
+    ncep : int, optional
+        Number of cepstra, only applicable if `do_dct` is True.
+    lowerf : float, optional
+        Lowest frequency of the filterbank.
+    upperf : float, optional
+        Highest frequency of the filterbank.
+    alpha : float, optional
+        Pre-emphasis coefficient.
+    fs : int, optional
+        Sampling rate.
+    wlen : float, optional
+        Window length.
+    nfft : int, optional
+        Length of the DFT.
+    compression : {'log', 'cubic'}
+        Type of amplitude compression.
+    do_deltas : bool, optional
+        Calculate 1st derivative (speed)
+    do_deltasdeltas : bool, optional
+        Calculate 2nd derivative (acceleration)
+
+
+    Methods
+    -------
+    transform(sig)
+        Encode a signal.
+
+    """
     def __init__(self,
+                 scale='mel',           # perceptual scaling of the filterbanks
                  nfilt=40,              # number of filters in mel bank
                  ncep=13,               # number of cepstra
-                 do_dct=True,
-                 lowerf=133.3333,
-                 upperf=6855.4976,
+                 do_dct=True,           # perform DCT
+                 lowerf=133.3333,       # bottom frequency of the filterbanks
+                 upperf=6855.4976,      # top frequency of the filterbanks
                  alpha=0.97,            # pre-emphasis coefficient
                  fs=16000,              # sampling rate
-                 frate=100,
+                 frate=100,             # framerate
                  wlen=0.01,             # window length
                  nfft=512,              # length of dft
-                 compression='log',
-                 do_deltas=False,
-                 do_deltasdeltas=False
+                 compression='log',     # amplitude compression
+                 do_deltas=False,       # calculate 1st derivative (speed)
+                 do_deltasdeltas=False  # calculate 2nd derivative (acceleration)
                  ):
         if not nfilt > 0:
-            raise(Exception,
+            raise(ValueError,
                   'Number of filters must be positive, not {0:%d}'
                   .format(nfilt))
         if upperf > fs // 2:
-            raise(Exception,
+            raise(ValueError,
                   "Upper frequency %f exceeds Nyquist %f" % (upperf, fs // 2))
         compression_types = ['log', 'cubicroot']
         if not compression in compression_types:
-            raise(Exception,
+            raise(ValueError,
                   'Compression must be one of [{0:s}], not {1}'
                   .format(', '.join(compression_types), compression))
+        self.compression = compression
 
-        # store params
+        self._set_scale(scale)
         self.lowerf = lowerf
         self.upperf = upperf
         self.nfft = nfft
@@ -176,9 +106,8 @@ class Spectral(object):
         self.fshift = fs / frate
         self.do_deltas = do_deltas
         self.do_deltasdeltas = do_deltasdeltas
-        self.compression = compression
-
         self.wlen_secs = wlen
+
         # build hamming window
         self.wlen_samples = int(wlen * fs)
         self.win = np.hamming(self.wlen_samples)
@@ -189,17 +118,32 @@ class Spectral(object):
 
         self._build_filters()
 
+    def _set_scale(self, scale):
+        self.scale = scale
+        if scale == 'mel':
+            self.to_hertz = scales.mel_to_hertz
+            self.from_hertz = scales.hertz_to_mel
+        elif scale == 'bark':
+            self.to_hertz = scales.bark_to_hertz
+            self.from_hertz = scales.hertz_to_bark
+        elif scale == 'erb':
+            self.to_hertz = scales.erb_to_hertz
+            self.from_hertz = scales.hertz_to_erb
+        else:
+            raise ValueError('scale must be one of [{0}], not {1}'.format(
+                ', '.join(['mel', 'bark', 'erb']), scale))
+
     def _build_filters(self):
         # build mel filter matrix
         self.filters = np.zeros((self.nfft//2 + 1, self.nfilt), 'd')
         dfreq = self.fs / self.nfft
 
-        melmax = hertz_to_mel(self.upperf)
-        melmin = hertz_to_mel(self.lowerf)
+        melmax = self.from_hertz(self.upperf)
+        melmin = self.from_hertz(self.lowerf)
         dmelbw = (melmax - melmin) / (self.nfilt + 1)
         # filter edges in hz
-        filt_edge = mel_to_hertz(melmin + dmelbw *
-                                 np.arange(self.nfilt + 2, dtype='d'))
+        filt_edge = self.to_hertz(melmin + dmelbw *
+                                  np.arange(self.nfilt + 2, dtype='d'))
 
         for whichfilt in range(0, self.nfilt):
             # Filter triangles in dft points

@@ -3,7 +3,6 @@
 
 __author__ = 'Maarten Versteegh'
 __email__ = 'maartenversteegh@gmail.com'
-__version__ = '0.1.7'
+__version__ = '0.1.8'
 
-from _spectral import hertz_to_mel, mel_to_hertz, Spectral, Mel, CubicMel, \
-    MFCC, SpectralABC
+from _spectral import Spectral
