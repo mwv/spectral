@@ -1,14 +1,15 @@
 {
-    "alpha": 0.97,
-    "frate": 100,
+    "pre_emph": 0.97,
+    "window_length": 0.025,
+    "window_shift": 0.01,
     "fs": 16000,
+    "scale": "mel",
     "lowerf": 100,
-    "upperf": 6855.4976,
-    "nfft": 512,
+    "upperf": 7000,
+    "nfft": 1024,
     "nfilt": 13,
     "wlen": 0.025,
     "do_dct": true,
-    "compression": "log",
-    "do_deltas": false,
-    "do_deltasdeltas": false
+    "energy_compression": "log",
+    "deltas": false,
 }
