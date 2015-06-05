@@ -13,9 +13,9 @@
 # ------------------------------------
 """_spectral: speech feature extraction.
 
-this version 0.2.0 is a complete rewrite of the code. it is not meant to be binary
-compatible with the previous version. since there is no original code left,
-this version is relicensed to GPL.
+this version 0.2.0 is a complete rewrite of the code. it is not meant to be
+binary compatible with the previous version. since there is no original code
+left, this version is relicensed to GPL.
 
 """
 
