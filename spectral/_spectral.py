@@ -50,7 +50,7 @@ class Spectral(object):
         rescale the filter magnitude
     compression : string, ['log', 'cubicroot']
         amplitude compression type on the filter banks.
-    do_dct : bool
+    dct : bool
         perform dct transform.
     nceps : int
         number of cepstral coefficients.
@@ -84,7 +84,7 @@ class Spectral(object):
                  taper_filt=True,
                  compression='log',
 
-                 do_dct=False,
+                 dct=False,
                  nceps=13,
                  log_e=True,
                  lifter=22,
@@ -169,14 +169,15 @@ class Spectral(object):
 
         self.filters = filts
 
-        self.lifter_c = lifter
-        self.do_dct = do_dct
+        self.lifter = lifter
+        self.dct = dct
         self.nceps = nceps
         self.log_e = log_e
-        if self.do_dct:
+        if self.dct:
             self._build_dctmtx()
 
-        self.do_deltas = deltas
+        self.deltas = deltas
+
     @property
     def config(self):
         return {k: getattr(self, k)
@@ -221,7 +222,7 @@ class Spectral(object):
         # power spectrum
         # frames = frames.real*frames.real + frames.imag*frames.imag
         frames = frames.real**2 / self.nfft
-        if self.do_dct and self.log_e:
+        if self.dct and self.log_e:
             # keep log energy column around for later
             log_e = np.log(frames.sum(axis=1).clip(self.eps, np.inf))
 
@@ -240,17 +241,17 @@ class Spectral(object):
         # energy compression
         frames = self.compressor(frames)
 
-        if self.do_dct:
+        if self.dct:
             frames = np.dot(frames, self.dctmtx.T)
-            if self.lifter_c:
-                frames = self.lifter(frames)
+            if self.lifter:
+                frames = self.do_lifter(frames)
             if self.log_e:
                 frames[:,0] = log_e
 
-        if self.do_deltas:
+        if self.deltas:
             frames = np.c_[frames,
-                           self.deltas(frames),
-                           self.deltasdeltas(frames)]
+                           self.do_deltas(frames),
+                           self.do_deltasdeltas(frames)]
 
         return frames
 
@@ -281,9 +282,9 @@ class Spectral(object):
         dctmtx[0,:] /= np.sqrt(2)
         self.dctmtx = dctmtx
 
-    def lifter(self, frames):
-        return frames * (1 + self.lifter_c/2. *
-                         np.sin(np.pi * np.arange(self.nceps) / self.lifter_c))
+    def do_lifter(self, frames):
+        return frames * (1 + self.lifter/2. *
+                         np.sin(np.pi * np.arange(self.nceps) / self.lifter))
 
     def set_scale(self, scale):
         if scale == 'hertz':
@@ -305,7 +306,7 @@ class Spectral(object):
         self.to_hertz = to_hertz
         self.from_hertz = from_hertz
 
-    def deltas(self, X):
+    def do_deltas(self, X):
         nframes, nceps = X.shape
         hlen = 4
         a = np.r_[hlen:-hlen-1:-1] / 60
@@ -316,7 +317,7 @@ class Spectral(object):
         d = flt.reshape((nframes + 8, nceps))
         return np.array(d[8:, :])
 
-    def deltasdeltas(self, X):
+    def do_deltasdeltas(self, X):
         nframes, nceps = X.shape
         hlen = 4
         a = np.r_[hlen:-hlen-1:-1] / 60
@@ -334,7 +335,6 @@ class Spectral(object):
         flt2 = ss.lfilter(f, 1, h.flat)
         dd = flt2.reshape((nframes + 2, nceps))
         return dd[2:, :]
-
 
 def hertz_to_mel(f):
     """
