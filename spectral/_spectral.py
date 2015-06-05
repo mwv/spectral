@@ -47,7 +47,7 @@ class Spectral(object):
         number of filters in bank
     taper_filt : bool
         rescale the filter magnitude
-    energy_compression : string, ['log', 'cubicroot']
+    compression : string, ['log', 'cubicroot']
         amplitude compression type on the filter banks.
     do_dct : bool
         perform dct transform.
@@ -81,7 +81,7 @@ class Spectral(object):
                  upperf=7000,
                  nfilt=40,
                  taper_filt=True,
-                 energy_compression='log',
+                 compression='log',
 
                  do_dct=False,
                  nceps=13,
@@ -135,17 +135,17 @@ class Spectral(object):
         self.nfft = nfft
 
         compression_types = ['log', 'cubicroot', 'none']
-        if not energy_compression in compression_types:
+        if not compression in compression_types:
             raise(ValueError,
-                  'Compression must be one of [{0:s}], not {1}'
-                  .format(', '.join(compression_types), energy_compression))
-        self.compression = energy_compression
+                  'compression must be one of [{0:s}], not {1}'
+                  .format(', '.join(compression_types), compression))
+        self.compression = compression
         if self.compression == 'log':
-            self.compressor = lambda x: np.log(x)
+            self.compressor = log_compression
         elif self.compression == 'cubicroot':
-            self.compressor = lambda x: x**(1./3)
+            self.compressor = cubicroot_compression
         else: # no compression
-            self.compressor = lambda x: x
+            self.compressor = identity_compression
 
         filts = np.zeros((self.nfft//2+1, self.nfilt), dtype=np.double)
         upperf = self.from_hertz(self.upperf).reshape(-1)[0]
@@ -488,3 +488,13 @@ def hertz_to_erb(f):
     """
     g = np.abs(f)
     return 11.17268 * np.sign(f) * np.log(1 + 46.06538 * g / (g + 14678.49))
+
+
+def log_compression(X):
+    return np.log(X)
+
+def cubicroot_compression(X):
+    return X**(1./3)
+
+def identity_compression(X):
+    return X
