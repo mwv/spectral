@@ -20,6 +20,7 @@ left, this version is relicensed to GPL.
 """
 
 from __future__ import division
+from inspect import getargspec
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
@@ -176,6 +177,11 @@ class Spectral(object):
             self._build_dctmtx()
 
         self.do_deltas = deltas
+    @property
+    def config(self):
+        return {k: getattr(self, k)
+                for k in getargspec(self.__class__.__init__).args[1:]}
+
 
     def transform(self, sig):
         """
