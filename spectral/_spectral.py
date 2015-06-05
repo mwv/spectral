@@ -180,6 +180,17 @@ class Spectral(object):
 
         self.deltas = deltas
 
+        if not self.dct:
+            if self.deltas:
+                self.n_features = self.nfilt * 3
+            else:
+                self.n_features = self.nfilt
+        else:
+            if self.deltas:
+                self.n_features = self.nceps * 3
+            else:
+                self.n_features = self.nceps
+
     @property
     def config(self):
         return {k: getattr(self, k)
