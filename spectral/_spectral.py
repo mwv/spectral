@@ -126,9 +126,11 @@ class Spectral(object):
             raise ValueError('pre_emph must be between 0 and 1, not {}'
                              .format(pre_emph))
         self.pre_emph = pre_emph
+        self.window_length = window_length
         self.wlen = int(window_length * fs)
         self.win = np.hamming(self.wlen)
         self.fs = fs
+        self.window_shift = window_shift
         self.fshift = int(window_shift * fs)
         if not (nfft > 0 and (nfft & (nfft-1) == 0)):
             raise ValueError('NFFT must be a positive power of two, not {}'
