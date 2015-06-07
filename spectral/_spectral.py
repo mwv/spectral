@@ -196,8 +196,7 @@ class Spectral(object):
         return {k: getattr(self, k)
                 for k in getargspec(self.__class__.__init__).args[1:]}
 
-
-    def transform(self, sig):
+    def transform(self, sig, noise_profile=None):
         """
         Convert audio signal to feature representation.
 
@@ -205,6 +204,8 @@ class Spectral(object):
         ----------
         sig : ndarray (nsamples,)
             audio signal
+        noise_profile : ndarray (nfft,)
+            optional profile of noise in each fft bin
 
         Returns
         -------
@@ -247,6 +248,9 @@ class Spectral(object):
         if self.noise_fr > 0:
             noise = frames[:self.noise_fr, :].mean(axis=0)
             frames /= noise
+
+        if not noise_profile is None:
+            frames /= noise_profile
 
         # filter bank
         frames = np.dot(frames, self.filters).clip(self.eps, np.inf)
