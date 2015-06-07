@@ -268,6 +268,35 @@ class Spectral(object):
 
         return frames
 
+    def get_spectrogram(self, sig):
+        sig = sig.astype(np.double)
+
+        # DC
+        if self.remove_dc:
+            sig = self.dc_filter(sig)
+
+        # median filter
+        if self.medfilt_t > 0:
+            sig = ss.medfilt(sig, self.medfilt_t)
+
+        # preemph spectral tilt
+        if self.pre_emph > 0:
+            sig = self.pre_emphasis(sig)
+
+        # gain normalize:
+        sig = sig / np.abs(sig).max()
+
+        # fft
+        frames = self.stft(sig)
+
+        # power spectrum
+        frames = frames.real**2 / self.nfft
+
+        # median filter 2d
+        if self.medfilt_s[0] > 0 and self.medfilt_s[1] > 0:
+            frames = ss.medfilt(frames, kernel_size=self.medfilt_s)
+
+        return frames
     def dc_filter(self, sig):
         b = [1, -1]
         a = [1, -0.999]
